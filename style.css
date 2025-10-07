@@ -1,0 +1,141 @@
+/* Estilos generales para la aplicación de gestión de proyectos */
+
+body {
+    font-family: Arial, sans-serif;
+    background-color: #f0f2f5;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    color: #333;
+}
+
+.container {
+    width: 90%;
+    max-width: 700px;
+}
+
+.card {
+    background-color: #fff;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    padding: 20px 25px;
+    margin: 15px auto;
+    animation: fadeIn 0.3s ease-in-out;
+}
+
+.hidden {
+    display: none;
+}
+
+label {
+    display: block;
+    margin-top: 12px;
+    font-weight: bold;
+}
+
+input[type="text"], input[type="password"] {
+    width: 100%;
+    padding: 8px;
+    margin-top: 4px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    box-sizing: border-box;
+}
+
+button {
+    background-color: #007bff;
+    color: #fff;
+    border: none;
+    padding: 10px 15px;
+    border-radius: 4px;
+    margin-top: 20px;
+    cursor: pointer;
+}
+
+button:hover {
+    background-color: #0056b3;
+}
+
+.hint {
+    margin-top: 15px;
+    font-size: 0.9rem;
+    color: #555;
+}
+
+.error {
+    color: #b00020;
+    margin-top: 10px;
+}
+
+/* Estilos específicos para paneles de usuario y administrador */
+#adminContainer .user-task-card {
+    border-top: 1px solid #eee;
+    padding: 12px 0;
+}
+
+#adminContainer .user-task-card:first-child {
+    border-top: none;
+}
+
+.user-task-card h3 {
+    margin: 0 0 8px 0;
+}
+
+.user-task-card ul.tasks {
+    margin: 0;
+    padding-left: 20px;
+}
+
+.user-task-card li {
+    margin-bottom: 5px;
+}
+
+.task-form {
+    display: flex;
+    margin-top: 10px;
+}
+
+.task-form input[type="text"] {
+    flex-grow: 1;
+    padding: 8px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+}
+
+.task-form button {
+    margin-left: 5px;
+    padding: 8px 12px;
+    background-color: #28a745;
+}
+
+.task-form button:hover {
+    background-color: #1e7e34;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* Diseño adaptable para móviles */
+@media (max-width: 500px) {
+    .card {
+        padding: 15px;
+    }
+    button {
+        width: 100%;
+        margin-top: 15px;
+    }
+    .task-form {
+        flex-direction: column;
+    }
+    .task-form input[type="text"] {
+        margin-bottom: 8px;
+    }
+    .task-form button {
+        margin-left: 0;
+    }
+}

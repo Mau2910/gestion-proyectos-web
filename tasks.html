@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Panel de Tareas - Gestión de Proyectos</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Panel para usuarios normales -->
+        <div id="userPanel" class="card hidden">
+            <h2>Mis Tareas</h2>
+            <ul id="taskList"></ul>
+            <button id="logoutBtn">Cerrar Sesión</button>
+        </div>
+        <!-- Panel para administrador -->
+        <div id="adminPanel" class="card hidden">
+            <h2>Panel de Administración</h2>
+            <div id="adminContainer"></div>
+            <button id="logoutBtn" class="logout">Cerrar Sesión</button>
+        </div>
+    </div>
+    <script src="common.js"></script>
+    <script src="tasks.js"></script>
+</body>
+</html>
