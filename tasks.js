@@ -1,182 +1,189 @@
-// Script para la página de tareas (panel de usuario y administrador)
-
+/* Script para la página de tareas (panel de usuario y administrador) */
 document.addEventListener('DOMContentLoaded', () => {
     const currentUser = sessionStorage.getItem('currentUser');
     if (!currentUser) {
-        // Si no hay usuario en sesión, redirigir a inicio de sesión
         window.location.href = 'login.html';
         return;
     }
 
-    const tasksByUser = loadTasks();
+    let tasksByUser = loadTasks();
     const users = loadUsers();
 
     const userPanel = document.getElementById('userPanel');
     const adminPanel = document.getElementById('adminPanel');
-    // Selecciona todos los botones de cierre de sesión (hay uno en cada panel)
-    const logoutButtons = document.querySelectorAll('#logoutBtn');
 
-    // Función para cerrar sesión
-    function logout() {
-        sessionStorage.removeItem('currentUser');
-        window.location.href = 'login.html';
-    }
-    // Asigna el evento a todos los botones encontrados
-    logoutButtons.forEach(btn => btn.addEventListener('click', logout));
+    function renderUserPanel(username) {
+        userPanel.innerHTML = '';
+        const heading = document.createElement('h3');
+        heading.textContent = 'Tus tareas';
+        userPanel.appendChild(heading);
 
-    if (currentUser === 'admin') {
-        // Mostrar panel de administración
-        userPanel.classList.add('hidden');
-        adminPanel.classList.remove('hidden');
-        renderAdminPanel();
-    } else {
-        // Mostrar panel de usuario
-        adminPanel.classList.add('hidden');
-        userPanel.classList.remove('hidden');
-        renderUserPanel(currentUser);
-    }
-
-   // Renderiza las tareas para el usuario específico con opciones para completar tareas
-function renderUserPanel(username) {
-    const taskList = document.getElementById('taskList');
-    taskList.innerHTML = '';
-    const tasks = tasksByUser[username] || [];
-    if (tasks.length === 0) {
-        const li = document.createElement('li');
-        li.textContent = 'No tienes tareas asignadas';
-        taskList.appendChild(li);
-    } else {
-        tasks.forEach((task, index) => {
-            const li = document.createElement('li');
-            const checkbox = document.createElement('input');
-            checkbox.type = 'checkbox';
-            checkbox.checked = !!task.completed;
-            const span = document.createElement('span');
-            span.textContent = task.text || task;
-            if (task.completed) {
-                span.classList.add('completed');
-            }
-            checkbox.addEventListener('change', () => {
-                tasksByUser[username][index].completed = checkbox.checked;
-                saveTasks(tasksByUser);
-                if (checkbox.checked) {
-                    span.classList.add('completed');
-                } else {
-                    span.classList.remove('completed');
-                }
-            });
-            li.appendChild(checkbox);
-            li.appendChild(span);
-            taskList.appendChild(li);
-        });
-    }
-}
-
-// Renderiza el panel del administrador con opciones para agregar usuarios, asignar tareas y ver/completar tareas
-function renderAdminPanel() {
-    const adminContainer = document.getElementById('adminContainer');
-    adminContainer.innerHTML = '';
-
-    // Sección para agregar un nuevo usuario
-    const addUserDiv = document.createElement('div');
-    addUserDiv.classList.add('admin-section');
-    const addUserLabel = document.createElement('label');
-    addUserLabel.textContent = 'Agregar usuario: ';
-    const addUserInput = document.createElement('input');
-    addUserInput.type = 'text';
-    addUserInput.placeholder = 'Nombre de usuario';
-    const addUserBtn = document.createElement('button');
-    addUserBtn.textContent = 'Agregar';
-    addUserBtn.addEventListener('click', () => {
-        const newUser = addUserInput.value.trim();
-        if (newUser !== '' && !users.some(u => u.username === newUser)) {
-            addUser(newUser); // agrega usuario con contraseña por defecto
-            users.push({ username: newUser, password: '1234' });
-            tasksByUser[newUser] = [];
-            addUserInput.value = '';
-            renderAdminPanel();
-        }
-    });
-    addUserDiv.appendChild(addUserLabel);
-    addUserDiv.appendChild(addUserInput);
-    addUserDiv.appendChild(addUserBtn);
-    adminContainer.appendChild(addUserDiv);
-
-    // Sección para asignar una nueva tarea a un usuario
-    const assignDiv = document.createElement('div');
-    assignDiv.classList.add('admin-section');
-    const userSelect = document.createElement('select');
-    users.forEach(u => {
-        if (u.username === 'admin') return;
-        const option = document.createElement('option');
-        option.value = u.username;
-        option.textContent = u.username;
-        userSelect.appendChild(option);
-    });
-    const assignInput = document.createElement('input');
-    assignInput.type = 'text';
-    assignInput.placeholder = 'Nueva tarea';
-    const assignBtn = document.createElement('button');
-    assignBtn.textContent = 'Asignar';
-    assignBtn.addEventListener('click', () => {
-        const taskText = assignInput.value.trim();
-        const selectedUser = userSelect.value;
-        if (taskText !== '' && selectedUser) {
-            assignTask(selectedUser, taskText, tasksByUser);
-            assignInput.value = '';
-            renderAdminPanel();
-        }
-    });
-    assignDiv.appendChild(userSelect);
-    assignDiv.appendChild(assignInput);
-    assignDiv.appendChild(assignBtn);
-    adminContainer.appendChild(assignDiv);
-
-    // Sección para mostrar tareas de cada usuario y marcar completadas
-    users.forEach(u => {
-        if (u.username === 'admin') return;
-        const userDiv = document.createElement('div');
-        userDiv.classList.add('user-task-card');
-        const header = document.createElement('h3');
-        header.textContent = u.username;
-        userDiv.appendChild(header);
         const list = document.createElement('ul');
-        list.classList.add('tasks');
-        const userTasks = tasksByUser[u.username] || [];
-        if (userTasks.length === 0) {
+        const tasks = tasksByUser[username] || [];
+
+        if (tasks.length === 0) {
             const li = document.createElement('li');
-            li.textContent = 'Sin tareas';
+            li.textContent = 'No tienes tareas asignadas.';
             list.appendChild(li);
         } else {
-            userTasks.forEach((task, index) => {
+            tasks.forEach((taskObj, index) => {
                 const li = document.createElement('li');
                 const checkbox = document.createElement('input');
                 checkbox.type = 'checkbox';
-                checkbox.checked = !!task.completed;
-                const span = document.createElement('span');
-                span.textContent = task.text || task;
-                if (task.completed) {
-                    span.classList.add('completed');
-                }
+                checkbox.checked = !!taskObj.completed;
                 checkbox.addEventListener('change', () => {
-                    tasksByUser[u.username][index].completed = checkbox.checked;
+                    tasksByUser[username][index].completed = checkbox.checked;
                     saveTasks(tasksByUser);
-                    if (checkbox.checked) {
-                        span.classList.add('completed');
-                    } else {
-                        span.classList.remove('completed');
-                    }
-                    // Si el admin marca/desmarca, actualizar panel de usuario si corresponde
-                    if (sessionStorage.getItem('currentUser') === u.username) {
-                        renderUserPanel(u.username);
-                    }
+                    renderUserPanel(username);
                 });
+                const span = document.createElement('span');
+                span.textContent = taskObj.text;
+                if (taskObj.completed) {
+                    span.style.textDecoration = 'line-through';
+                }
                 li.appendChild(checkbox);
                 li.appendChild(span);
                 list.appendChild(li);
             });
         }
-        userDiv.appendChild(list);
-        adminContainer.appendChild(userDiv);
+        userPanel.appendChild(list);
+    }
+
+    function renderAdminPanel() {
+        adminPanel.innerHTML = '';
+
+        // Sección para agregar nuevo usuario
+        const addUserDiv = document.createElement('div');
+        addUserDiv.classList.add('admin-section');
+        const addUserLabel = document.createElement('h3');
+        addUserLabel.textContent = 'Agregar nuevo usuario';
+        const addUserInput = document.createElement('input');
+        addUserInput.type = 'text';
+        addUserInput.placeholder = 'Nombre de usuario';
+        const addUserButton = document.createElement('button');
+        addUserButton.textContent = 'Agregar usuario';
+        addUserButton.addEventListener('click', () => {
+            const newUsername = addUserInput.value.trim();
+            if (newUsername) {
+                const added = addUser(newUsername, '1234');
+                if (added) {
+                    // actualizar estructuras locales
+                    users.push({ username: newUsername, password: '1234' });
+                    tasksByUser[newUsername] = [];
+                    addUserInput.value = '';
+                    saveTasks(tasksByUser);
+                    renderAdminPanel();
+                } else {
+                    alert('El usuario ya existe o el nombre no es válido.');
+                }
+            }
+        });
+        addUserDiv.appendChild(addUserLabel);
+        addUserDiv.appendChild(addUserInput);
+        addUserDiv.appendChild(addUserButton);
+        adminPanel.appendChild(addUserDiv);
+
+        // Sección para asignar tareas
+        const assignDiv = document.createElement('div');
+        assignDiv.classList.add('admin-section');
+        const assignLabel = document.createElement('h3');
+        assignLabel.textContent = 'Asignar tarea';
+        const userSelect = document.createElement('select');
+        users.forEach((user) => {
+            if (user.username !== 'admin') {
+                const option = document.createElement('option');
+                option.value = user.username;
+                option.textContent = user.username;
+                userSelect.appendChild(option);
+            }
+        });
+        const taskInput = document.createElement('input');
+        taskInput.type = 'text';
+        taskInput.placeholder = 'Descripción de la tarea';
+        const assignButton = document.createElement('button');
+        assignButton.textContent = 'Asignar';
+        assignButton.addEventListener('click', () => {
+            const selectedUser = userSelect.value;
+            const text = taskInput.value.trim();
+            if (selectedUser && text) {
+                assignTask(selectedUser, text);
+                // recargar tareas
+                tasksByUser = loadTasks();
+                taskInput.value = '';
+                renderAdminPanel();
+            }
+        });
+        assignDiv.appendChild(assignLabel);
+        assignDiv.appendChild(userSelect);
+        assignDiv.appendChild(taskInput);
+        assignDiv.appendChild(assignButton);
+        adminPanel.appendChild(assignDiv);
+
+        // Sección para mostrar tareas existentes
+        const tasksDiv = document.createElement('div');
+        tasksDiv.classList.add('admin-section');
+        const tasksHeading = document.createElement('h3');
+        tasksHeading.textContent = 'Tareas asignadas';
+        tasksDiv.appendChild(tasksHeading);
+
+        Object.keys(tasksByUser).forEach((username) => {
+            if (username === 'admin') return;
+            const userTasks = tasksByUser[username] || [];
+            const card = document.createElement('div');
+            card.classList.add('user-task-card');
+            const title = document.createElement('h4');
+            title.textContent = username;
+            card.appendChild(title);
+
+            const ul = document.createElement('ul');
+            if (userTasks.length === 0) {
+                const li = document.createElement('li');
+                li.textContent = 'Sin tareas';
+                ul.appendChild(li);
+            } else {
+                userTasks.forEach((taskObj, index) => {
+                    const li = document.createElement('li');
+                    const checkbox = document.createElement('input');
+                    checkbox.type = 'checkbox';
+                    checkbox.checked = !!taskObj.completed;
+                    checkbox.addEventListener('change', () => {
+                        tasksByUser[username][index].completed = checkbox.checked;
+                        saveTasks(tasksByUser);
+                        renderAdminPanel();
+                    });
+                    const span = document.createElement('span');
+                    span.textContent = taskObj.text;
+                    if (taskObj.completed) {
+                        span.style.textDecoration = 'line-through';
+                    }
+                    li.appendChild(checkbox);
+                    li.appendChild(span);
+                    ul.appendChild(li);
+                });
+            }
+            card.appendChild(ul);
+            tasksDiv.appendChild(card);
+        });
+        adminPanel.appendChild(tasksDiv);
+    }
+
+    // Mostrar panel según rol
+    if (currentUser === 'admin') {
+        userPanel.classList.add('hidden');
+        adminPanel.classList.remove('hidden');
+        renderAdminPanel();
+    } else {
+        adminPanel.classList.add('hidden');
+        userPanel.classList.remove('hidden');
+        renderUserPanel(currentUser);
+    }
+
+    // Añadir funcionalidad de logout para ambos paneles
+    const logoutButtons = document.querySelectorAll('#logoutBtn');
+    logoutButtons.forEach(btn => {
+        btn.addEventListener('click', () => {
+            sessionStorage.removeItem('currentUser');
+            window.location.href = 'login.html';
+        });
     });
-}
+});
