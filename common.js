@@ -27,24 +27,33 @@ function saveUsers(users) {
 }
 
 // Cargar tareas asignadas desde localStorage o inicializar para cada usuario
-function loadTasks() {
-    const stored = localStorage.getItem('tasksByUser');
+funcion loadTasks() {
+   const stored = localStorage.getItem('tasksByUser');
+    let tasks = {};
     if (stored) {
         try {
-            return JSON.parse(stored);
+            tasks = JSON.parse(stored);
         } catch (e) {
-            console.error('No se pudo analizar las tareas guardadas. Restableciendo a vacío.');
+            console.error('No se pudo analizar las tareas guardadas. Restableciendo a vac\u00edo.');
         }
-    }
-    const tasks = {};
-    defaultUsers.forEach(u => {
+   }
+    const allUsers = loadUsers();
+    allUsers.forEach(u => {
         if (u.username !== 'admin') {
-            tasks[u.username] = [];
+            if (!tasks[u.username]) {
+                tasks[u.username] = [];
+            }
+            tasks[u.username] = tasks[u.username].map(t => {
+                if (typeof t === 'string') {
+                    return { text: t, completed: false };
+                } else {
+                    return { text: t.text || '', completed: !!t.completed };
+                }
+            });
         }
     });
-    localStorage.setItem('tasksByUser', JSON.stringify(tasks));
-    return tasks;
-}
+    saveTasks(tasks);
+  return tasks;
 
 // Guardar tareas
 function saveTasks(tasks) {
@@ -56,6 +65,29 @@ function assignTask(username, task, tasksByUser) {
     if (!tasksByUser[username]) {
         tasksByUser[username] = [];
     }
-    tasksByUser[username].push(task);
+    // Convert task to object with text and completed properties if needed
+    let taskObj;
+    if (typeof task === 'string') {
+        taskObj = { text: task, completed: false };
+    } else {
+        taskObj = { text: task.text || '', completed: !!task.completed };
+    }
+    tasksByUser[username].push(taskObj);
     saveTasks(tasksByUser);
+
+
+// Agregar un nuevo usuario con contraseña por defecto
+function addUser(newUsername) {
+    const users = loadUsers();
+    // Evitar nombres vacíos y duplicados, y evitar sobrescribir admin
+    if (!newUsername || users.some(u => u.username === newUsername)) {
+        return;
+    }
+    users.push({ username: newUsername, password: '1234' });
+    saveUsers(users);
+    // Inicializar tareas vacías para el nuevo usuario
+    const tasksByUser = loadTasks();
+    tasksByUser[newUsername] = [];
+    saveTasks(tasksByUser);
+}
 }
