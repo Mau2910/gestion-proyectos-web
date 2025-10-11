@@ -132,25 +132,49 @@ document.addEventListener('DOMContentLoaded', () => {
                 li.appendChild(barContainer);
             }
 
-            // Mostrar formulario de retroalimentación si la tarea está completada y aún no tiene feedback
-            if (taskObj.completed && !taskObj.feedback) {
-                const feedbackInput = document.createElement('input');
-                feedbackInput.type = 'text';
-                feedbackInput.placeholder = 'Escribe tu retroalimentación';
-                const sendBtn = document.createElement('button');
-                sendBtn.textContent = 'Enviar';
-                sendBtn.addEventListener('click', () => {
-                    const fb = feedbackInput.value.trim();
-                    tasksByUser[username][index].feedback = fb;
-                    saveTasks(tasksByUser);
-                    renderUserPanel(username);
-                });
-                li.appendChild(feedbackInput);
-                li.appendChild(sendBtn);
-            } else if (taskObj.feedback) {
-                const fbP = document.createElement('p');
-                fbP.textContent = 'Retroalimentación: ' + taskObj.feedback;
-                li.appendChild(fbP);
+            // Si existe un comentario del administrador (por ejemplo, tras no aceptar la finalización)
+            // y la tarea se encuentra activa (no completada), mostrarlo para que el usuario sepa
+            // por qué se le devolvió la tarea.
+            if (!taskObj.completed && taskObj.adminFeedback) {
+                const adminMsg = document.createElement('p');
+                adminMsg.textContent = 'Motivo del administrador: ' + taskObj.adminFeedback;
+                li.appendChild(adminMsg);
+            }
+
+            // Gestión de retroalimentación y estado cuando el usuario marca la tarea como completada
+            if (taskObj.completed) {
+                // Si aún no ha proporcionado feedback, mostrar el campo de entrada
+                if (!taskObj.feedback) {
+                    const feedbackInput = document.createElement('input');
+                    feedbackInput.type = 'text';
+                    feedbackInput.placeholder = 'Escribe tu retroalimentación';
+                    const sendBtn = document.createElement('button');
+                    sendBtn.textContent = 'Enviar';
+                    sendBtn.addEventListener('click', () => {
+                        const fb = feedbackInput.value.trim();
+                        tasksByUser[username][index].feedback = fb;
+                        saveTasks(tasksByUser);
+                        renderUserPanel(username);
+                    });
+                    li.appendChild(feedbackInput);
+                    li.appendChild(sendBtn);
+                } else {
+                    const fbP = document.createElement('p');
+                    fbP.textContent = 'Retroalimentación: ' + taskObj.feedback;
+                    li.appendChild(fbP);
+                }
+                // Si la tarea no ha sido confirmada por un administrador, indicar el estado pendiente
+                if (!taskObj.finalized) {
+                    const statusP = document.createElement('p');
+                    statusP.textContent = 'Pendiente de verificación';
+                    li.appendChild(statusP);
+                    // Si además existe un comentario del administrador (el administrador devolvió la tarea previamente)
+                    if (taskObj.adminFeedback) {
+                        const adminMsg = document.createElement('p');
+                        adminMsg.textContent = 'Motivo del administrador: ' + taskObj.adminFeedback;
+                        li.appendChild(adminMsg);
+                    }
+                }
             }
 
             taskList.appendChild(li);
@@ -312,25 +336,43 @@ document.addEventListener('DOMContentLoaded', () => {
                 barContainer.appendChild(bar);
                 li.appendChild(barContainer);
             }
-            // Retroalimentación
-            if (taskObj.completed && !taskObj.feedback) {
-                const fbInput = document.createElement('input');
-                fbInput.type = 'text';
-                fbInput.placeholder = 'Escribe tu retroalimentación';
-                const send = document.createElement('button');
-                send.textContent = 'Enviar';
-                send.addEventListener('click', () => {
-                    const fb = fbInput.value.trim();
-                    tasksByUser[currentUsername][index].feedback = fb;
-                    saveTasks(tasksByUser);
-                    showAdminMyTasks();
-                });
-                li.appendChild(fbInput);
-                li.appendChild(send);
-            } else if (taskObj.feedback) {
-                const p = document.createElement('p');
-                p.textContent = 'Retroalimentación: ' + taskObj.feedback;
-                li.appendChild(p);
+            // Si existe un comentario del administrador en esta tarea y no está completada, mostrarlo
+            if (!taskObj.completed && taskObj.adminFeedback) {
+                const adminMsg = document.createElement('p');
+                adminMsg.textContent = 'Motivo del administrador: ' + taskObj.adminFeedback;
+                li.appendChild(adminMsg);
+            }
+            // Retroalimentación y estado al completar la tarea
+            if (taskObj.completed) {
+                if (!taskObj.feedback) {
+                    const fbInput = document.createElement('input');
+                    fbInput.type = 'text';
+                    fbInput.placeholder = 'Escribe tu retroalimentación';
+                    const send = document.createElement('button');
+                    send.textContent = 'Enviar';
+                    send.addEventListener('click', () => {
+                        const fb = fbInput.value.trim();
+                        tasksByUser[currentUsername][index].feedback = fb;
+                        saveTasks(tasksByUser);
+                        showAdminMyTasks();
+                    });
+                    li.appendChild(fbInput);
+                    li.appendChild(send);
+                } else {
+                    const p = document.createElement('p');
+                    p.textContent = 'Retroalimentación: ' + taskObj.feedback;
+                    li.appendChild(p);
+                }
+                if (!taskObj.finalized) {
+                    const status = document.createElement('p');
+                    status.textContent = 'Pendiente de verificación';
+                    li.appendChild(status);
+                    if (taskObj.adminFeedback) {
+                        const adminMsg2 = document.createElement('p');
+                        adminMsg2.textContent = 'Motivo del administrador: ' + taskObj.adminFeedback;
+                        li.appendChild(adminMsg2);
+                    }
+                }
             }
             list.appendChild(li);
         });
@@ -493,24 +535,50 @@ document.addEventListener('DOMContentLoaded', () => {
                     barC.appendChild(bar);
                     li.appendChild(barC);
                 }
-                // Mostrar retroalimentación si existe
+                // Mostrar retroalimentación del usuario si existe
                 if (taskObj.feedback) {
                     const fb = document.createElement('p');
                     fb.textContent = 'Retroalimentación: ' + taskObj.feedback;
                     li.appendChild(fb);
                 }
-                // Botón para confirmar finalización si el usuario la completó
+                // Mostrar retroalimentación del administrador si existe y la tarea aún está activa
+                if (taskObj.adminFeedback && (!taskObj.completed || !taskObj.finalized)) {
+                    const adminFb = document.createElement('p');
+                    adminFb.textContent = 'Motivo del administrador: ' + taskObj.adminFeedback;
+                    li.appendChild(adminFb);
+                }
+                // Opciones de gestión cuando el usuario completó la tarea pero el administrador aún no la finaliza
                 if (taskObj.completed && !taskObj.finalized) {
+                    // Botón para confirmar la finalización
                     const finalizeBtn = document.createElement('button');
                     finalizeBtn.textContent = 'Confirmar finalización';
                     finalizeBtn.addEventListener('click', () => {
                         tasksByUser[u.username][index].finalized = true;
+                        // Al confirmar la finalización, limpiamos cualquier retroalimentación del administrador
+                        tasksByUser[u.username][index].adminFeedback = '';
                         saveTasks(tasksByUser);
                         showAdminAddTasks();
                     });
                     li.appendChild(finalizeBtn);
+                    // Botón para indicar que la tarea no está finalizada y debe reactivarse
+                    const notFinalizedBtn = document.createElement('button');
+                    notFinalizedBtn.textContent = 'Tarea no finalizada';
+                    // Aplicar estilo personalizado para este botón
+                    notFinalizedBtn.classList.add('return-task-btn');
+                    notFinalizedBtn.addEventListener('click', () => {
+                        const reason = prompt('Ingresa el motivo por el cual la tarea no se considera finalizada:');
+                        if (reason !== null) {
+                            // Reactivar la tarea: marcarla como no completada y sin finalización
+                            tasksByUser[u.username][index].completed = false;
+                            tasksByUser[u.username][index].finalized = false;
+                            tasksByUser[u.username][index].adminFeedback = reason.trim();
+                            saveTasks(tasksByUser);
+                            showAdminAddTasks();
+                        }
+                    });
+                    li.appendChild(notFinalizedBtn);
                 }
-                // Botón eliminar tarea
+                // Botón eliminar tarea (siempre visible mientras no esté finalizada)
                 const delTask = document.createElement('button');
                 delTask.textContent = 'Eliminar tarea';
                 delTask.classList.add('delete-task-btn');
@@ -602,7 +670,8 @@ document.addEventListener('DOMContentLoaded', () => {
             body.innerHTML = `<strong>Tarea:</strong> ${item.task.text}<br>` +
                 `<strong>Asignada:</strong> ${item.task.assignedDate || ''}<br>` +
                 `<strong>Fecha límite:</strong> ${item.task.dueDate || 'sin fecha'}<br>` +
-                `<strong>Retroalimentación:</strong> ${item.task.feedback || 'N/A'}`;
+                `<strong>Retroalimentación:</strong> ${item.task.feedback || 'N/A'}<br>` +
+                `<strong>Motivo del administrador:</strong> ${item.task.adminFeedback || 'N/A'}`;
             card.appendChild(body);
             // Barra Gantt para contexto temporal si hay fecha límite
             if (item.task.dueDate) {
