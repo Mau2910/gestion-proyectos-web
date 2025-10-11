@@ -83,6 +83,51 @@ body {
     background-color: #d68910;
 }
 
+/* Estilo para el icono de menú hamburguesa que se usa tanto en el panel de
+   administración como en el panel de usuario. Al usar una clase en lugar de
+   un identificador, podemos reutilizar el mismo estilo para ambas vistas. */
+.hamburger {
+    font-size: 24px;
+    cursor: pointer;
+    user-select: none;
+}
+
+/* Contenedor de tareas del usuario con dos columnas: tareas por hacer a la
+   izquierda y tareas completadas pendientes de verificación a la derecha. */
+.user-tasks-container {
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+}
+
+/* Cada columna dentro del contenedor de tareas. El tamaño flexible permite
+   adaptarse al espacio disponible y apilarse en dispositivos estrechos. */
+.tasks-column {
+    flex: 1;
+    min-width: 200px;
+}
+
+/* Encabezados de las columnas de tareas. Se retira el margen superior para
+   alinearlos correctamente con el contenido. */
+.tasks-column h4 {
+    margin-top: 0;
+}
+
+/* Listas dentro de cada columna de tareas del usuario. Se elimina el
+   sangrado predeterminado y se usa un sangrado izquierdo moderado para
+   diferenciar los elementos sin mostrar viñetas. */
+.tasks-column ul {
+    list-style: none;
+    padding-left: 20px;
+}
+
+/* Mensaje de bienvenida en la página de inicio de sesión */
+.welcome {
+    margin-top: 15px;
+    font-size: 1rem;
+    color: #555;
+}
+
 /* Estilos de la barra tipo Gantt */
 .gantt-container {
     width: 100%;
