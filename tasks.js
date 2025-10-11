@@ -57,7 +57,8 @@ document.addEventListener('DOMContentLoaded', () => {
         // Mostrar panel de usuario
         adminPanel.classList.add('hidden');
         userPanel.classList.remove('hidden');
-        renderUserPanel(currentUsername);
+        // Inicializar panel de usuario con menú y secciones
+        initUserPanel();
     }
 
     /**
@@ -705,5 +706,316 @@ document.addEventListener('DOMContentLoaded', () => {
             card.appendChild(delBtn);
             content.appendChild(card);
         });
+    }
+
+    /**
+     * Inicializa el panel de usuario creando un menú de navegación con opciones
+     * (mis tareas, cambiar contraseña y cerrar sesión) y un contenedor donde
+     * se mostrará la sección activa. Al cargar, se muestra la lista de tareas
+     * en dos columnas: tareas por hacer y tareas completadas pendientes de verificación.
+     */
+    function initUserPanel() {
+        // Actualizar datos desde almacenamiento
+        tasksByUser = loadTasks();
+        users = loadUsers();
+        // Limpiar el panel de usuario
+        userPanel.innerHTML = '';
+        // Contenedor del menú y del contenido
+        const menuContainer = document.createElement('div');
+        menuContainer.classList.add('menu-container');
+        // Icono hamburguesa (el estilo se define mediante la clase .hamburger)
+        const hamburger = document.createElement('div');
+        hamburger.classList.add('hamburger');
+        hamburger.textContent = '\u2630';
+        menuContainer.appendChild(hamburger);
+        // Lista de opciones
+        const menuList = document.createElement('ul');
+        menuList.classList.add('menu-list', 'hidden');
+        const userOptions = [
+            { id: 'userTasks', label: 'Mis tareas' },
+            { id: 'changePassword', label: 'Cambiar contraseña' },
+            { id: 'logoutUser', label: 'Cerrar sesión' },
+        ];
+        userOptions.forEach(opt => {
+            const li = document.createElement('li');
+            li.dataset.action = opt.id;
+            li.textContent = opt.label;
+            li.addEventListener('click', () => {
+                // Ocultar el menú después de seleccionar una opción
+                menuList.classList.add('hidden');
+                handleUserMenuClick(opt.id);
+            });
+            menuList.appendChild(li);
+        });
+        menuContainer.appendChild(menuList);
+        userPanel.appendChild(menuContainer);
+        // Contenedor para el contenido de cada sección
+        const contentDiv = document.createElement('div');
+        contentDiv.id = 'userContent';
+        userPanel.appendChild(contentDiv);
+        // Mostrar u ocultar el menú al hacer clic en el icono
+        hamburger.addEventListener('click', () => {
+            menuList.classList.toggle('hidden');
+        });
+        // Mostrar la sección predeterminada (mis tareas)
+        showUserTasks();
+    }
+
+    /**
+     * Maneja las opciones del menú del usuario y redirige a la sección adecuada.
+     * @param {string} action Identificador de la sección
+     */
+    function handleUserMenuClick(action) {
+        switch (action) {
+            case 'userTasks':
+                showUserTasks();
+                break;
+            case 'changePassword':
+                showChangePassword();
+                break;
+            case 'logoutUser':
+                try {
+                    sessionStorage.removeItem('currentUser');
+                } catch (e) {
+                    window.currentUser = null;
+                }
+                window.location.href = 'login.html';
+                break;
+            default:
+                showUserTasks();
+        }
+    }
+
+    /**
+     * Muestra las tareas del usuario en dos columnas: tareas por hacer y tareas
+     * completadas pendientes de verificación. Permite marcar tareas como
+     * completadas/incompletas, ver retroalimentación del administrador y
+     * proporcionar retroalimentación cuando se marca como completada.
+     */
+    function showUserTasks() {
+        // Refrescar datos
+        tasksByUser = loadTasks();
+        users = loadUsers();
+        const contentDiv = document.getElementById('userContent');
+        if (!contentDiv) return;
+        contentDiv.innerHTML = '';
+        const heading = document.createElement('h3');
+        heading.textContent = 'Mis tareas';
+        contentDiv.appendChild(heading);
+        // Contenedor general con columnas
+        const container = document.createElement('div');
+        container.classList.add('user-tasks-container');
+        // Columna izquierda: tareas por hacer
+        const colLeft = document.createElement('div');
+        colLeft.classList.add('tasks-column');
+        const leftHeader = document.createElement('h4');
+        leftHeader.textContent = 'Por hacer';
+        colLeft.appendChild(leftHeader);
+        const leftList = document.createElement('ul');
+        colLeft.appendChild(leftList);
+        // Columna derecha: tareas completadas pendientes de verificación
+        const colRight = document.createElement('div');
+        colRight.classList.add('tasks-column');
+        const rightHeader = document.createElement('h4');
+        rightHeader.textContent = 'Pendientes por verificar';
+        colRight.appendChild(rightHeader);
+        const rightList = document.createElement('ul');
+        colRight.appendChild(rightList);
+        container.appendChild(colLeft);
+        container.appendChild(colRight);
+        contentDiv.appendChild(container);
+        const userTasks = tasksByUser[currentUsername] || [];
+        let leftCount = 0;
+        let rightCount = 0;
+        userTasks.forEach((taskObj, index) => {
+            // No mostrar tareas ya finalizadas por el administrador
+            if (taskObj.finalized) return;
+            const li = document.createElement('li');
+            li.classList.add('user-task-item');
+            // Descripción y fecha límite
+            const descSpan = document.createElement('span');
+            descSpan.textContent = `${taskObj.text} (vence: ${taskObj.dueDate || 'sin fecha'})`;
+            if (taskObj.completed) {
+                descSpan.style.textDecoration = 'line-through';
+            }
+            // Barra Gantt
+            let barContainer;
+            if (taskObj.dueDate) {
+                barContainer = document.createElement('div');
+                barContainer.classList.add('gantt-container');
+                const bar = document.createElement('div');
+                bar.classList.add('gantt-bar');
+                const start = new Date(taskObj.assignedDate);
+                const end = new Date(taskObj.dueDate);
+                const total = (end - start) / (1000 * 60 * 60 * 24);
+                const today = new Date();
+                const done = (today - start) / (1000 * 60 * 60 * 24);
+                let percent = 0;
+                if (total > 0) {
+                    percent = Math.min(100, Math.max(0, Math.round((done / total) * 100)));
+                } else {
+                    percent = 100;
+                }
+                bar.style.width = `${percent}%`;
+                if (percent >= 100 && !taskObj.completed) {
+                    bar.style.backgroundColor = '#e74c3c';
+                }
+                barContainer.appendChild(bar);
+            }
+            if (!taskObj.completed) {
+                // Tareas por hacer con casilla de verificación
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.checked = false;
+                checkbox.addEventListener('change', () => {
+                    tasksByUser[currentUsername][index].completed = checkbox.checked;
+                    if (!checkbox.checked) {
+                        tasksByUser[currentUsername][index].feedback = '';
+                    }
+                    saveTasks(tasksByUser);
+                    showUserTasks();
+                });
+                li.appendChild(checkbox);
+                li.appendChild(descSpan);
+                if (barContainer) li.appendChild(barContainer);
+                // Si el administrador devolvió la tarea, mostrar su motivo
+                if (taskObj.adminFeedback) {
+                    const adminMsg = document.createElement('p');
+                    adminMsg.textContent = 'Motivo del administrador: ' + taskObj.adminFeedback;
+                    li.appendChild(adminMsg);
+                }
+                leftList.appendChild(li);
+                leftCount++;
+            } else {
+                // Tareas completadas pero pendientes de verificación
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.checked = true;
+                checkbox.addEventListener('change', () => {
+                    tasksByUser[currentUsername][index].completed = checkbox.checked;
+                    if (!checkbox.checked) {
+                        tasksByUser[currentUsername][index].feedback = '';
+                    }
+                    saveTasks(tasksByUser);
+                    showUserTasks();
+                });
+                li.appendChild(checkbox);
+                li.appendChild(descSpan);
+                if (barContainer) li.appendChild(barContainer);
+                // Mostrar retroalimentación del usuario o permitir ingresar
+                if (!taskObj.feedback) {
+                    const feedbackInput = document.createElement('input');
+                    feedbackInput.type = 'text';
+                    feedbackInput.placeholder = 'Escribe tu retroalimentación';
+                    const sendBtn = document.createElement('button');
+                    sendBtn.textContent = 'Enviar';
+                    sendBtn.addEventListener('click', () => {
+                        const fb = feedbackInput.value.trim();
+                        tasksByUser[currentUsername][index].feedback = fb;
+                        saveTasks(tasksByUser);
+                        showUserTasks();
+                    });
+                    li.appendChild(feedbackInput);
+                    li.appendChild(sendBtn);
+                } else {
+                    const fbP = document.createElement('p');
+                    fbP.textContent = 'Retroalimentación: ' + taskObj.feedback;
+                    li.appendChild(fbP);
+                }
+                // Nota de estado pendiente y motivo del administrador (si existe)
+                if (!taskObj.finalized) {
+                    const statusP = document.createElement('p');
+                    statusP.textContent = 'Pendiente de verificación';
+                    li.appendChild(statusP);
+                    if (taskObj.adminFeedback) {
+                        const adminMsg = document.createElement('p');
+                        adminMsg.textContent = 'Motivo del administrador: ' + taskObj.adminFeedback;
+                        li.appendChild(adminMsg);
+                    }
+                }
+                rightList.appendChild(li);
+                rightCount++;
+            }
+        });
+        if (leftCount === 0) {
+            const li = document.createElement('li');
+            li.textContent = 'Sin tareas por hacer';
+            leftList.appendChild(li);
+        }
+        if (rightCount === 0) {
+            const li = document.createElement('li');
+            li.textContent = 'Sin tareas completadas pendientes';
+            rightList.appendChild(li);
+        }
+    }
+
+    /**
+     * Muestra el formulario para cambiar la contraseña del usuario actual y
+     * gestiona la validación y actualización en el almacenamiento.
+     */
+    function showChangePassword() {
+        const contentDiv = document.getElementById('userContent');
+        if (!contentDiv) return;
+        contentDiv.innerHTML = '';
+        const heading = document.createElement('h3');
+        heading.textContent = 'Cambiar contraseña';
+        contentDiv.appendChild(heading);
+        // Crear etiquetas e inputs
+        const formDiv = document.createElement('div');
+        const currLabel = document.createElement('label');
+        currLabel.textContent = 'Contraseña actual:';
+        const currInput = document.createElement('input');
+        currInput.type = 'password';
+        const newLabel = document.createElement('label');
+        newLabel.textContent = 'Contraseña nueva:';
+        const newInput = document.createElement('input');
+        newInput.type = 'password';
+        const confLabel = document.createElement('label');
+        confLabel.textContent = 'Confirmar contraseña nueva:';
+        const confInput = document.createElement('input');
+        confInput.type = 'password';
+        const saveBtn = document.createElement('button');
+        saveBtn.textContent = 'Guardar cambios';
+        const msgP = document.createElement('p');
+        // Guardar cambios
+        saveBtn.addEventListener('click', () => {
+            const curr = currInput.value;
+            const newPass = newInput.value;
+            const conf = confInput.value;
+            msgP.textContent = '';
+            msgP.style.color = '#b00020';
+            if (newPass !== conf) {
+                msgP.textContent = 'La nueva contraseña y la confirmación no coinciden.';
+                return;
+            }
+            // Cargar usuarios
+            users = loadUsers();
+            const idx = users.findIndex(u => u.username === currentUsername);
+            if (idx === -1) {
+                msgP.textContent = 'Usuario no encontrado.';
+                return;
+            }
+            if (users[idx].password !== curr) {
+                msgP.textContent = 'La contraseña actual es incorrecta.';
+                return;
+            }
+            // Actualizar contraseña y guardar
+            users[idx].password = newPass;
+            saveUsers(users);
+            msgP.textContent = 'Contraseña actualizada correctamente.';
+            msgP.style.color = '#28a745';
+            currInput.value = '';
+            newInput.value = '';
+            confInput.value = '';
+        });
+        formDiv.appendChild(currLabel);
+        formDiv.appendChild(currInput);
+        formDiv.appendChild(newLabel);
+        formDiv.appendChild(newInput);
+        formDiv.appendChild(confLabel);
+        formDiv.appendChild(confInput);
+        formDiv.appendChild(saveBtn);
+        formDiv.appendChild(msgP);
+        contentDiv.appendChild(formDiv);
     }
 });
