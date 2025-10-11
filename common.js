@@ -133,6 +133,10 @@ function loadTasks() {
                 assignedDate: task.assignedDate || today,
                 dueDate: task.dueDate || '',
                 feedback: task.feedback || '',
+                // Comentario del administrador cuando una tarea marcada por el usuario
+                // no es aceptada como finalizada. Se inicializa vacío si no existe.
+                adminFeedback: task.adminFeedback || '',
+                // Indica si el administrador confirmó la finalización de la tarea.
                 finalized: !!task.finalized
             };
         });
@@ -175,6 +179,8 @@ function assignTask(username, task, tasksByUser) {
             assignedDate: task.assignedDate || today,
             dueDate: task.dueDate || '',
             feedback: task.feedback || '',
+            // Al asignar una tarea nueva no hay retroalimentación del administrador
+            adminFeedback: task.adminFeedback || '',
             finalized: !!task.finalized
         };
     }
