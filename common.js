@@ -8,17 +8,68 @@ const defaultUsers = [
     { username: 'usuario2', password: 'abcd', role: 'user' },
 ];
 
+/**
+ * Comprueba si localStorage está disponible. En ciertos navegadores
+ * (por ejemplo, Safari en modo privado o navegadores con almacenamiento
+ * desactivado) el acceso a localStorage puede lanzar excepciones. Para
+ * evitar que la aplicación falle en estos casos, envolvemos los accesos
+ * en una función de detección. Si localStorage no está disponible,
+ * todas las operaciones de carga y guardado utilizarán únicamente
+ * los valores en memoria y no persistirán.
+ * @returns {boolean} true si localStorage está disponible, false en caso contrario
+ */
+function isStorageAvailable() {
+    try {
+        const testKey = '__storage_test__';
+        window.localStorage.setItem(testKey, testKey);
+        window.localStorage.removeItem(testKey);
+        return true;
+    } catch (e) {
+        return false;
+    }
+}
+
+/**
+ * Obtiene un elemento del almacenamiento si está disponible.
+ * Si el almacenamiento no está disponible devuelve null.
+ * @param {string} key Clave del elemento a obtener
+ * @returns {string|null} Valor almacenado o null
+ */
+function getStorageItem(key) {
+    if (!isStorageAvailable()) return null;
+    try {
+        return window.localStorage.getItem(key);
+    } catch (e) {
+        return null;
+    }
+}
+
+/**
+ * Guarda un elemento en el almacenamiento si está disponible.
+ * @param {string} key Clave del elemento
+ * @param {string} value Valor a almacenar
+ */
+function setStorageItem(key, value) {
+    if (!isStorageAvailable()) return;
+    try {
+        window.localStorage.setItem(key, value);
+    } catch (e) {
+        // Si falla, no hacer nada; el almacenamiento no está disponible
+    }
+}
+
 // Cargar usuarios desde localStorage o usar predeterminados
 function loadUsers() {
-    // Cargar usuarios desde localStorage. Si hay un error de análisis o
-    // el formato es incorrecto, se restablece a los valores predeterminados.
-    const stored = localStorage.getItem('users');
+    // Cargar usuarios desde localStorage. Si hay un error de análisis o el
+    // almacenamiento no está disponible, se restablece a los valores
+    // predeterminados. Además se normaliza la estructura de cada usuario para
+    // asegurar que todos tengan rol definido.
     let users = defaultUsers;
+    const stored = getStorageItem('users');
     if (stored) {
         try {
             const parsed = JSON.parse(stored);
             if (Array.isArray(parsed)) {
-                // Garantizar que cada usuario tenga un rol válido
                 users = parsed.map(u => ({
                     username: u.username,
                     password: u.password,
@@ -29,24 +80,23 @@ function loadUsers() {
             console.error('No se pudo analizar los usuarios guardados. Restableciendo a valores por defecto.');
         }
     }
-    // Guardar de nuevo para normalizar
-    localStorage.setItem('users', JSON.stringify(users));
+    // Guardar de nuevo para normalizar si hay almacenamiento disponible
+    setStorageItem('users', JSON.stringify(users));
     return users;
 }
 
 // Guardar usuarios en localStorage
 function saveUsers(users) {
-    localStorage.setItem('users', JSON.stringify(users));
+    // Guardar usuarios solo si el almacenamiento está disponible
+    setStorageItem('users', JSON.stringify(users));
 }
 
 // Cargar tareas asignadas desde localStorage o inicializar para cada usuario
 function loadTasks() {
-    // Cargar las tareas de cada usuario desde localStorage. Si el análisis
-    // falla, se usa un objeto vacío. Además se normaliza la estructura de
-    // cada tarea para que tenga texto, fecha de asignación, fecha límite,
-    // estado de completado y retroalimentación.
+    // Cargar las tareas de cada usuario desde el almacenamiento. Si el análisis
+    // falla o el almacenamiento no está disponible, se usa un objeto vacío.
     let tasks = {};
-    const stored = localStorage.getItem('tasksByUser');
+    const stored = getStorageItem('tasksByUser');
     if (stored) {
         try {
             const parsed = JSON.parse(stored);
@@ -65,21 +115,25 @@ function loadTasks() {
         }
         // Normalizar cada tarea en la lista
         tasks[u.username] = tasks[u.username].map(task => {
+            // Si la tarea es una cadena simple, convertirla en un objeto con propiedades por defecto
             if (typeof task === 'string') {
                 return {
                     text: task,
                     completed: false,
                     assignedDate: today,
                     dueDate: '',
-                    feedback: ''
+                    feedback: '',
+                    finalized: false
                 };
             }
+            // Asegurarse de que todas las propiedades existan. Si 'finalized' no existe, establecerlo en false
             return {
                 text: task.text || '',
                 completed: !!task.completed,
                 assignedDate: task.assignedDate || today,
                 dueDate: task.dueDate || '',
-                feedback: task.feedback || ''
+                feedback: task.feedback || '',
+                finalized: !!task.finalized
             };
         });
     });
@@ -90,7 +144,7 @@ function loadTasks() {
 
 // Guardar tareas
 function saveTasks(tasks) {
-    localStorage.setItem('tasksByUser', JSON.stringify(tasks));
+    setStorageItem('tasksByUser', JSON.stringify(tasks));
 }
 
 // Asignar tarea a un usuario (usado desde la página de tareas por el administrador)
@@ -111,7 +165,8 @@ function assignTask(username, task, tasksByUser) {
             completed: false,
             assignedDate: today,
             dueDate: '',
-            feedback: ''
+            feedback: '',
+            finalized: false
         };
     } else {
         taskObj = {
@@ -119,7 +174,8 @@ function assignTask(username, task, tasksByUser) {
             completed: !!task.completed,
             assignedDate: task.assignedDate || today,
             dueDate: task.dueDate || '',
-            feedback: task.feedback || ''
+            feedback: task.feedback || '',
+            finalized: !!task.finalized
         };
     }
     tasksByUser[username].push(taskObj);
