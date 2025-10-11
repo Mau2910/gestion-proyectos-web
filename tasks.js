@@ -443,17 +443,11 @@ document.addEventListener('DOMContentLoaded', () => {
             const title = document.createElement('h4');
             title.textContent = `${u.username}${u.role === 'admin' ? ' (admin)' : ''}`;
             header.appendChild(title);
-            // Botón eliminar usuario (excepto el actual)
-            if (u.username !== currentUsername) {
-                const delUser = document.createElement('button');
-                delUser.textContent = 'Eliminar usuario';
-                delUser.classList.add('delete-user-btn');
-                delUser.addEventListener('click', () => {
-                    deleteUser(u.username);
-                    showAdminAddTasks();
-                });
-                header.appendChild(delUser);
-            }
+            // Anteriormente se incluía aquí un botón para eliminar el usuario
+            // directamente desde la sección de asignación de tareas. Para evitar
+            // confusión y separar las responsabilidades, esta funcionalidad se
+            // ha eliminado. La eliminación de usuarios se gestiona desde la
+            // sección "Eliminar usuarios" del menú.
             card.appendChild(header);
             // Lista de tareas no finalizadas
             const ul = document.createElement('ul');
@@ -577,9 +571,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const completed = [];
         users.forEach(u => {
             const list = tasksByUser[u.username] || [];
-            list.forEach(taskObj => {
+            list.forEach((taskObj, index) => {
+                // Incluir también el índice de la tarea para poder eliminarla
                 if (taskObj.finalized) {
-                    completed.push({ user: u.username, role: u.role, task: taskObj });
+                    completed.push({ user: u.username, role: u.role, task: taskObj, index });
                 }
             });
         });
@@ -630,6 +625,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 barC.appendChild(bar);
                 card.appendChild(barC);
             }
+            // Botón para eliminar una tarea finalizada. Permite quitarla del registro.
+            const delBtn = document.createElement('button');
+            delBtn.textContent = 'Eliminar tarea';
+            delBtn.classList.add('delete-task-btn');
+            delBtn.addEventListener('click', () => {
+                deleteTask(item.user, item.index);
+                showAdminCompletedTasks();
+            });
+            card.appendChild(delBtn);
             content.appendChild(card);
         });
     }
