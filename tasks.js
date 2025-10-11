@@ -9,6 +9,19 @@ document.addEventListener('DOMContentLoaded', () => {
     try {
         currentUsername = sessionStorage.getItem('currentUser');
     } catch (e) {
+        currentUsername = null;
+    }
+    // Si no se pudo obtener de sessionStorage, intentar con el mecanismo de
+    // respaldo (window.name a través de getStorageItem) o con la variable
+    // global definida en login.js como último recurso.
+    if (!currentUsername) {
+        try {
+            currentUsername = getStorageItem('sessionCurrentUser');
+        } catch (e) {
+            currentUsername = null;
+        }
+    }
+    if (!currentUsername) {
         currentUsername = window.currentUser || null;
     }
     if (!currentUsername) {
@@ -36,8 +49,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 try {
                     sessionStorage.removeItem('currentUser');
                 } catch (e) {
-                    window.currentUser = null;
+                    // Nada
                 }
+                // Limpiar el mecanismo de respaldo y la variable global
+                setStorageItem('sessionCurrentUser', null);
+                window.currentUser = null;
                 window.location.href = 'login.html';
             });
         });
@@ -777,8 +793,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 try {
                     sessionStorage.removeItem('currentUser');
                 } catch (e) {
-                    window.currentUser = null;
+                    // Ignorar si sessionStorage no está disponible
                 }
+                // Limpiar el mecanismo de respaldo y la variable global
+                setStorageItem('sessionCurrentUser', null);
+                window.currentUser = null;
                 window.location.href = 'login.html';
                 break;
             default:
