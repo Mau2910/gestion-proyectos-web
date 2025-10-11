@@ -1,7 +1,6 @@
 // Script para la página de inicio de sesión
 
 // Cargar usuarios para validación
-const users = loadUsers();
 
 document.addEventListener('DOMContentLoaded', () => {
     const loginForm = document.getElementById('loginForm');
@@ -14,6 +13,7 @@ document.addEventListener('DOMContentLoaded', () => {
         e.preventDefault();
         const username = usernameInput.value.trim();
         const password = passwordInput.value;
+                const users = loadUsers();
         const user = users.find(u => u.username === username);
         if (!user || user.password !== password) {
             errorMsg.textContent = 'Usuario o contraseña incorrectos';
