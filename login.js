@@ -24,8 +24,19 @@ document.addEventListener('DOMContentLoaded', () => {
             try {
                 sessionStorage.setItem('currentUser', username);
             } catch (e) {
-                // Fallback: almacenar en una propiedad global
+                // Fallback: almacenar en almacenamiento alternativo en memoria
+                // además de en una propiedad global por compatibilidad
+                setStorageItem('sessionCurrentUser', username);
                 window.currentUser = username;
+            }
+            // Por compatibilidad, guardar el nombre de usuario también en el
+            // mecanismo de respaldo siempre que localStorage esté disponible,
+            // aunque sessionStorage funcione. Esto asegura que tasks.html pueda
+            // recuperarlo en caso de que sessionStorage se borre al recargar.
+            try {
+                setStorageItem('sessionCurrentUser', username);
+            } catch (e) {
+                // ignorar
             }
             window.location.href = 'tasks.html';
     });
