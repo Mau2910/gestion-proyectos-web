@@ -35,26 +35,67 @@ function isStorageAvailable() {
  * @param {string} key Clave del elemento a obtener
  * @returns {string|null} Valor almacenado o null
  */
+/**
+ * Obtiene un elemento del almacenamiento si está disponible. Si el
+ * almacenamiento local no está disponible (por ejemplo en navegadores
+ * con almacenamiento deshabilitado), se utiliza la propiedad window.name
+ * como mecanismo de respaldo persistente entre cargas de página. window.name
+ * persiste mientras la pestaña permanezca abierta, por lo que nos
+ * permite mantener datos durante la sesión actual.
+ *
+ * @param {string} key Clave del elemento a obtener
+ * @returns {string|null} Valor almacenado o null
+ */
 function getStorageItem(key) {
-    if (!isStorageAvailable()) return null;
+    // Si localStorage funciona, usarlo directamente
+    if (isStorageAvailable()) {
+        try {
+            return window.localStorage.getItem(key);
+        } catch (e) {
+            // Si hay un error inesperado, continuar con respaldo
+        }
+    }
+    // Respaldo: parsear window.name como un JSON de claves
     try {
-        return window.localStorage.getItem(key);
+        const store = window.name ? JSON.parse(window.name) : {};
+        return store && Object.prototype.hasOwnProperty.call(store, key) ? store[key] : null;
     } catch (e) {
+        // Si no se puede analizar, devolver null
         return null;
     }
 }
 
 /**
- * Guarda un elemento en el almacenamiento si está disponible.
+ * Guarda un elemento en el almacenamiento si está disponible. Si el
+ * almacenamiento local no está disponible, guarda los datos en la
+ * propiedad window.name, que persiste entre navegaciones dentro de la
+ * misma pestaña. Se almacena como JSON de pares clave-valor.
+ *
  * @param {string} key Clave del elemento
  * @param {string} value Valor a almacenar
  */
 function setStorageItem(key, value) {
-    if (!isStorageAvailable()) return;
+    // Intentar usar localStorage si está disponible
+    if (isStorageAvailable()) {
+        try {
+            window.localStorage.setItem(key, value);
+            return;
+        } catch (e) {
+            // Si falla, continuamos con respaldo
+        }
+    }
+    // Respaldo: usar window.name
     try {
-        window.localStorage.setItem(key, value);
+        const store = window.name ? JSON.parse(window.name) : {};
+        // Si value es null o undefined, eliminar la clave
+        if (value === null || value === undefined) {
+            delete store[key];
+        } else {
+            store[key] = value;
+        }
+        window.name = JSON.stringify(store);
     } catch (e) {
-        // Si falla, no hacer nada; el almacenamiento no está disponible
+        // Si hay un error, no persistimos
     }
 }
 
