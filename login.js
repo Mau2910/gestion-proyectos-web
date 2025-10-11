@@ -18,8 +18,15 @@ document.addEventListener('DOMContentLoaded', () => {
             errorMsg.textContent = 'Usuario o contraseña incorrectos';
             return;
         }
-        // Almacenar usuario actual en sessionStorage y redirigir
-        sessionStorage.setItem('currentUser', username);
-        window.location.href = 'tasks.html';
+            // Almacenar usuario actual en sessionStorage si es posible. En
+            // navegadores donde sessionStorage no está disponible (por ejemplo,
+            // algunos modos privados), usar un fallback en memoria.
+            try {
+                sessionStorage.setItem('currentUser', username);
+            } catch (e) {
+                // Fallback: almacenar en una propiedad global
+                window.currentUser = username;
+            }
+            window.location.href = 'tasks.html';
     });
 });
