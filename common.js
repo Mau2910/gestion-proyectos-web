@@ -12,7 +12,10 @@ function loadUsers() {
     const stored = localStorage.getItem('users');
     if (stored) {
         try {
-            return JSON.parse(stored);
+            const parsed = JSON.parse(stored);
+            if (Array.isArray(parsed)) {
+                return parsed;
+            }
         } catch (e) {
             console.error('No se pudo analizar los usuarios guardados. Restableciendo a valores por defecto.');
         }
@@ -27,16 +30,16 @@ function saveUsers(users) {
 }
 
 // Cargar tareas asignadas desde localStorage o inicializar para cada usuario
-funcion loadTasks() {
-   const stored = localStorage.getItem('tasksByUser');
+function loadTasks() {
+    const stored = localStorage.getItem('tasksByUser');
     let tasks = {};
     if (stored) {
         try {
             tasks = JSON.parse(stored);
         } catch (e) {
-            console.error('No se pudo analizar las tareas guardadas. Restableciendo a vac\u00edo.');
+            console.error('No se pudo analizar las tareas guardadas. Restableciendo a vacío.');
         }
-   }
+    }
     const allUsers = loadUsers();
     allUsers.forEach(u => {
         if (u.username !== 'admin') {
@@ -53,7 +56,8 @@ funcion loadTasks() {
         }
     });
     saveTasks(tasks);
-  return tasks;
+    return tasks;
+}
 
 // Guardar tareas
 function saveTasks(tasks) {
@@ -62,6 +66,10 @@ function saveTasks(tasks) {
 
 // Asignar tarea a un usuario (usado desde la página de tareas por el administrador)
 function assignTask(username, task, tasksByUser) {
+    // If tasksByUser is not provided, load current tasks
+    if (!tasksByUser) {
+        tasksByUser = loadTasks();
+    }
     if (!tasksByUser[username]) {
         tasksByUser[username] = [];
     }
@@ -74,14 +82,14 @@ function assignTask(username, task, tasksByUser) {
     }
     tasksByUser[username].push(taskObj);
     saveTasks(tasksByUser);
-
+}
 
 // Agregar un nuevo usuario con contraseña por defecto
 function addUser(newUsername) {
     const users = loadUsers();
     // Evitar nombres vacíos y duplicados, y evitar sobrescribir admin
     if (!newUsername || users.some(u => u.username === newUsername)) {
-        return;
+        return false;
     }
     users.push({ username: newUsername, password: '1234' });
     saveUsers(users);
@@ -89,5 +97,5 @@ function addUser(newUsername) {
     const tasksByUser = loadTasks();
     tasksByUser[newUsername] = [];
     saveTasks(tasksByUser);
-}
+    return true;
 }
