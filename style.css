@@ -69,6 +69,20 @@ body {
     background-color: #c0392b;
 }
 
+/* Botón para reactivar tareas (marcar como no finalizada) */
+.return-task-btn {
+    margin-left: 8px;
+    padding: 4px 8px;
+    background-color: #f39c12;
+    color: #fff;
+    border: none;
+    border-radius: 3px;
+    cursor: pointer;
+}
+.return-task-btn:hover {
+    background-color: #d68910;
+}
+
 /* Estilos de la barra tipo Gantt */
 .gantt-container {
     width: 100%;
@@ -173,6 +187,49 @@ button:hover {
 
 .task-form button:hover {
     background-color: #1e7e34;
+}
+
+/* ---- Estilos para el menú de administración ---- */
+.menu-container {
+    position: relative;
+    margin-bottom: 20px;
+}
+
+/* Icono de menú hamburguesa */
+#hamburger {
+    font-size: 24px;
+    cursor: pointer;
+    user-select: none;
+}
+
+/* Lista de opciones del menú */
+.menu-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    background-color: #fff;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    position: absolute;
+    left: 0;
+    top: 32px;
+    z-index: 100;
+    width: 200px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.15);
+}
+.menu-list.hidden {
+    display: none;
+}
+.menu-list li {
+    padding: 10px 15px;
+    cursor: pointer;
+    border-bottom: 1px solid #eee;
+}
+.menu-list li:last-child {
+    border-bottom: none;
+}
+.menu-list li:hover {
+    background-color: #f0f0f0;
 }
 
 @keyframes fadeIn {
