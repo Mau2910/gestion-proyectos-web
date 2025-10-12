@@ -33,23 +33,32 @@ document.addEventListener('DOMContentLoaded', async () => {
     const userPanel = document.getElementById('userPanel');
     const adminPanel = document.getElementById('adminPanel');
 
-    // Cargar datos iniciales. Si loadUsers devuelve una promesa (en modo
-    // Supabase), esperar a que se resuelva y luego sustituir la función
-    // global loadUsers por una versión que devuelve los usuarios
-    // cargados. Esto permite seguir usando loadUsers() de forma
-    // síncrona en el resto del código.
-    let tasksByUser = loadTasks();
+    // Cargar datos iniciales. Si loadUsers y loadTasks devuelven promesas
+    // (en modo Supabase), esperar a que se resuelvan y luego sustituir
+    // las funciones globales para devolver los datos cargados de forma
+    // síncrona. Esto permite seguir usando loadUsers() y loadTasks()
+    // en el resto del código sin await.
+    let tasksByUser;
     let users;
+    try {
+        tasksByUser = await loadTasks();
+    } catch (e) {
+        tasksByUser = loadTasks();
+    }
     try {
         users = await loadUsers();
     } catch (e) {
         users = loadUsers();
     }
-    // Sobrescribir loadUsers para que devuelva los usuarios cargados de
-    // forma síncrona. Guardar la original para futuras actualizaciones.
+    // Sobrescribir loadUsers para que devuelva los usuarios cargados de forma síncrona.
     if (typeof window.loadUsers === 'function') {
         window._originalLoadUsers = window.loadUsers;
         window.loadUsers = () => users;
+    }
+    // Sobrescribir loadTasks para devolver las tareas ya cargadas.
+    if (typeof window.loadTasks === 'function') {
+        window._originalLoadTasks = window.loadTasks;
+        window.loadTasks = () => tasksByUser;
     }
 
     // Obtener el objeto de usuario actual para saber su rol
@@ -119,13 +128,19 @@ document.addEventListener('DOMContentLoaded', async () => {
             const checkbox = document.createElement('input');
             checkbox.type = 'checkbox';
             checkbox.checked = taskObj.completed;
-            checkbox.addEventListener('change', () => {
+            checkbox.addEventListener('change', async () => {
                 tasksByUser[username][index].completed = checkbox.checked;
                 // Si desmarca, limpiar retroalimentación
                 if (!checkbox.checked) {
                     tasksByUser[username][index].feedback = '';
                 }
                 saveTasks(tasksByUser);
+                // Sincronizar con Supabase si es posible
+                try {
+                    await updateTask(tasksByUser[username][index]);
+                } catch (e) {
+                    // Si falla la sincronización, continuar con la versión local
+                }
                 renderUserPanel(username);
             });
             li.appendChild(checkbox);
@@ -328,12 +343,17 @@ document.addEventListener('DOMContentLoaded', async () => {
             const checkbox = document.createElement('input');
             checkbox.type = 'checkbox';
             checkbox.checked = taskObj.completed;
-            checkbox.addEventListener('change', () => {
+            checkbox.addEventListener('change', async () => {
                 tasksByUser[currentUsername][index].completed = checkbox.checked;
                 if (!checkbox.checked) {
                     tasksByUser[currentUsername][index].feedback = '';
                 }
                 saveTasks(tasksByUser);
+                try {
+                    await updateTask(tasksByUser[currentUsername][index]);
+                } catch (e) {
+                    // Continuar aún si falla la sincronización
+                }
                 showAdminMyTasks();
             });
             li.appendChild(checkbox);
@@ -607,11 +627,17 @@ document.addEventListener('DOMContentLoaded', async () => {
                     // Botón para confirmar la finalización
                     const finalizeBtn = document.createElement('button');
                     finalizeBtn.textContent = 'Confirmar finalización';
-                    finalizeBtn.addEventListener('click', () => {
+                    finalizeBtn.addEventListener('click', async () => {
                         tasksByUser[u.username][index].finalized = true;
                         // Al confirmar la finalización, limpiamos cualquier retroalimentación del administrador
                         tasksByUser[u.username][index].adminFeedback = '';
                         saveTasks(tasksByUser);
+                        // Sincronizar con la base de datos
+                        try {
+                            await updateTask(tasksByUser[u.username][index]);
+                        } catch (e) {
+                            // Ignorar errores
+                        }
                         showAdminAddTasks();
                     });
                     li.appendChild(finalizeBtn);
@@ -620,7 +646,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     notFinalizedBtn.textContent = 'Tarea no finalizada';
                     // Aplicar estilo personalizado para este botón
                     notFinalizedBtn.classList.add('return-task-btn');
-                    notFinalizedBtn.addEventListener('click', () => {
+                    notFinalizedBtn.addEventListener('click', async () => {
                         const reason = prompt('Ingresa el motivo por el cual la tarea no se considera finalizada:');
                         if (reason !== null) {
                             // Reactivar la tarea: marcarla como no completada y sin finalización
@@ -628,6 +654,11 @@ document.addEventListener('DOMContentLoaded', async () => {
                             tasksByUser[u.username][index].finalized = false;
                             tasksByUser[u.username][index].adminFeedback = reason.trim();
                             saveTasks(tasksByUser);
+                            try {
+                                await updateTask(tasksByUser[u.username][index]);
+                            } catch (e) {
+                                // Ignorar
+                            }
                             showAdminAddTasks();
                         }
                     });
@@ -637,8 +668,12 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const delTask = document.createElement('button');
                 delTask.textContent = 'Eliminar tarea';
                 delTask.classList.add('delete-task-btn');
-                delTask.addEventListener('click', () => {
-                    deleteTask(u.username, index);
+                delTask.addEventListener('click', async () => {
+                    try {
+                        await deleteTask(u.username, index);
+                    } catch (e) {
+                        deleteTask(u.username, index);
+                    }
                     showAdminAddTasks();
                 });
                 li.appendChild(delTask);
@@ -660,11 +695,16 @@ document.addEventListener('DOMContentLoaded', async () => {
             dInput.type = 'date';
             const assign = document.createElement('button');
             assign.textContent = 'Asignar';
-            assign.addEventListener('click', () => {
+            assign.addEventListener('click', async () => {
                 const text = tInput.value.trim();
                 const due = dInput.value;
                 if (text) {
-                    assignTask(u.username, { text: text, dueDate: due }, tasksByUser);
+                    try {
+                        await assignTask(u.username, { text: text, dueDate: due }, tasksByUser);
+                    } catch (e) {
+                        // Si falla, intentar sin await (para fallback local)
+                        assignTask(u.username, { text: text, dueDate: due }, tasksByUser);
+                    }
                     // Reiniciar campos y refrescar vista
                     tInput.value = '';
                     dInput.value = '';
@@ -753,8 +793,12 @@ document.addEventListener('DOMContentLoaded', async () => {
             const delBtn = document.createElement('button');
             delBtn.textContent = 'Eliminar tarea';
             delBtn.classList.add('delete-task-btn');
-            delBtn.addEventListener('click', () => {
-                deleteTask(item.user, item.index);
+            delBtn.addEventListener('click', async () => {
+                try {
+                    await deleteTask(item.user, item.index);
+                } catch (e) {
+                    deleteTask(item.user, item.index);
+                }
                 showAdminCompletedTasks();
             });
             card.appendChild(delBtn);
@@ -924,12 +968,17 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const checkbox = document.createElement('input');
                 checkbox.type = 'checkbox';
                 checkbox.checked = false;
-                checkbox.addEventListener('change', () => {
+                checkbox.addEventListener('change', async () => {
                     tasksByUser[currentUsername][index].completed = checkbox.checked;
                     if (!checkbox.checked) {
                         tasksByUser[currentUsername][index].feedback = '';
                     }
                     saveTasks(tasksByUser);
+                    try {
+                        await updateTask(tasksByUser[currentUsername][index]);
+                    } catch (e) {
+                        // Continuar con los datos locales si falla
+                    }
                     showUserTasks();
                 });
                 li.appendChild(checkbox);
@@ -948,12 +997,17 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const checkbox = document.createElement('input');
                 checkbox.type = 'checkbox';
                 checkbox.checked = true;
-                checkbox.addEventListener('change', () => {
+                checkbox.addEventListener('change', async () => {
                     tasksByUser[currentUsername][index].completed = checkbox.checked;
                     if (!checkbox.checked) {
                         tasksByUser[currentUsername][index].feedback = '';
                     }
                     saveTasks(tasksByUser);
+                    try {
+                        await updateTask(tasksByUser[currentUsername][index]);
+                    } catch (e) {
+                        // Ignorar errores de sincronización
+                    }
                     showUserTasks();
                 });
                 li.appendChild(checkbox);
@@ -966,10 +1020,15 @@ document.addEventListener('DOMContentLoaded', async () => {
                     feedbackInput.placeholder = 'Escribe tu retroalimentación';
                     const sendBtn = document.createElement('button');
                     sendBtn.textContent = 'Enviar';
-                    sendBtn.addEventListener('click', () => {
+                    sendBtn.addEventListener('click', async () => {
                         const fb = feedbackInput.value.trim();
                         tasksByUser[currentUsername][index].feedback = fb;
                         saveTasks(tasksByUser);
+                        try {
+                            await updateTask(tasksByUser[currentUsername][index]);
+                        } catch (e) {
+                            // Ignorar errores
+                        }
                         showUserTasks();
                     });
                     li.appendChild(feedbackInput);
