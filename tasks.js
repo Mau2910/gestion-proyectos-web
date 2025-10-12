@@ -1,6 +1,6 @@
 // Script para la página de tareas (panel de usuario y administrador)
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
     // Obtener el usuario actual desde sessionStorage o un fallback global. En
     // algunos navegadores con almacenamiento de sesión deshabilitado, acceder
     // a sessionStorage puede lanzar excepciones. Si no se puede acceder o no
@@ -33,9 +33,24 @@ document.addEventListener('DOMContentLoaded', () => {
     const userPanel = document.getElementById('userPanel');
     const adminPanel = document.getElementById('adminPanel');
 
-    // Cargar datos iniciales
+    // Cargar datos iniciales. Si loadUsers devuelve una promesa (en modo
+    // Supabase), esperar a que se resuelva y luego sustituir la función
+    // global loadUsers por una versión que devuelve los usuarios
+    // cargados. Esto permite seguir usando loadUsers() de forma
+    // síncrona en el resto del código.
     let tasksByUser = loadTasks();
-    let users = loadUsers();
+    let users;
+    try {
+        users = await loadUsers();
+    } catch (e) {
+        users = loadUsers();
+    }
+    // Sobrescribir loadUsers para que devuelva los usuarios cargados de
+    // forma síncrona. Guardar la original para futuras actualizaciones.
+    if (typeof window.loadUsers === 'function') {
+        window._originalLoadUsers = window.loadUsers;
+        window.loadUsers = () => users;
+    }
 
     // Obtener el objeto de usuario actual para saber su rol
     const currentUserObj = users.find(u => u.username === currentUsername);
@@ -427,15 +442,27 @@ document.addEventListener('DOMContentLoaded', () => {
         select.appendChild(optAdmin);
         const btn = document.createElement('button');
         btn.textContent = 'Agregar';
-        btn.addEventListener('click', () => {
+        btn.addEventListener('click', async () => {
             const uname = input.value.trim();
             const role = select.value;
-            if (addUser(uname, role)) {
+            let added = false;
+            try {
+                added = await addUser(uname, role);
+            } catch (e) {
+                added = addUser(uname, role);
+            }
+            if (added) {
                 input.value = '';
                 select.value = 'user';
-                // Actualizar datos y mostrar mensaje
+                // Actualizar datos locales y la caché de usuarios
                 tasksByUser = loadTasks();
-                users = loadUsers();
+                try {
+                    users = await loadUsers();
+                } catch (e) {
+                    users = loadUsers();
+                }
+                // Actualizar la función loadUsers global para devolver la nueva lista
+                window.loadUsers = () => users;
                 alert('Usuario agregado correctamente');
             } else {
                 alert('El usuario ya existe o el nombre no es válido.');
@@ -466,8 +493,19 @@ document.addEventListener('DOMContentLoaded', () => {
             const del = document.createElement('button');
             del.textContent = 'Eliminar';
             del.classList.add('delete-user-btn');
-            del.addEventListener('click', () => {
-                deleteUser(u.username);
+            del.addEventListener('click', async () => {
+                try {
+                    await deleteUser(u.username);
+                } catch (e) {
+                    deleteUser(u.username);
+                }
+                // Actualizar la lista de usuarios y la caché
+                try {
+                    users = await loadUsers();
+                } catch (e) {
+                    users = loadUsers();
+                }
+                window.loadUsers = () => users;
                 showAdminDeleteUsers();
             });
             li.appendChild(del);
