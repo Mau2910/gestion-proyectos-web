@@ -199,10 +199,51 @@ async function saveUsers(users) {
     setStorageItem('users', JSON.stringify(users));
 }
 
-// Cargar tareas asignadas desde localStorage o inicializar para cada usuario
-function loadTasks() {
-    // Cargar las tareas de cada usuario desde el almacenamiento. Si el análisis
-    // falla o el almacenamiento no está disponible, se usa un objeto vacío.
+// Cargar tareas asignadas. Si existe un cliente Supabase, las tareas se
+// recuperan desde la tabla `tasks` y se agrupan por usuario. De lo
+// contrario, se utilizan los datos del almacenamiento local. Cuando se
+// cargan desde Supabase esta función devuelve una promesa; de otro modo
+// devuelve un objeto de inmediato.
+async function loadTasks() {
+    // Si hay un cliente de Supabase configurado, cargar tareas desde la base
+    // de datos. Cada tarea almacenada incluye un ID para poder actualizarla
+    // o eliminarla posteriormente. Agrupar por usuario para la estructura
+    // esperada por el resto de la aplicación.
+    if (supabaseClient) {
+        try {
+            const { data, error } = await supabaseClient.from('tasks').select('*');
+            if (!error && Array.isArray(data)) {
+                const tasksByUser = {};
+                // Inicializar entradas para cada usuario existente
+                const users = await loadUsers();
+                users.forEach(u => {
+                    tasksByUser[u.username] = [];
+                });
+                data.forEach(row => {
+                    const username = row.username;
+                    if (!tasksByUser[username]) {
+                        tasksByUser[username] = [];
+                    }
+                    tasksByUser[username].push({
+                        id: row.id,
+                        text: row.text || '',
+                        completed: !!row.completed,
+                        assignedDate: row.assigned_date || row.assignedDate || '',
+                        dueDate: row.due_date || row.dueDate || '',
+                        feedback: row.feedback || '',
+                        adminFeedback: row.adminfeedback || row.adminFeedback || '',
+                        finalized: !!row.finalized
+                    });
+                });
+                // Guardar una copia en almacenamiento local como respaldo
+                saveTasks(tasksByUser);
+                return tasksByUser;
+            }
+        } catch (e) {
+            console.error('Error al cargar tareas desde Supabase:', e);
+        }
+    }
+    // Fallback: cargar de localStorage o window.name
     let tasks = {};
     const stored = getStorageItem('tasksByUser');
     if (stored) {
@@ -215,15 +256,13 @@ function loadTasks() {
             console.error('No se pudo analizar las tareas guardadas. Restableciendo a vacío.');
         }
     }
-    const users = loadUsers();
+    const users = await loadUsers();
     const today = new Date().toISOString().split('T')[0];
     users.forEach(u => {
         if (!tasks[u.username]) {
             tasks[u.username] = [];
         }
-        // Normalizar cada tarea en la lista
         tasks[u.username] = tasks[u.username].map(task => {
-            // Si la tarea es una cadena simple, convertirla en un objeto con propiedades por defecto
             if (typeof task === 'string') {
                 return {
                     text: task,
@@ -231,44 +270,51 @@ function loadTasks() {
                     assignedDate: today,
                     dueDate: '',
                     feedback: '',
+                    adminFeedback: '',
                     finalized: false
                 };
             }
-            // Asegurarse de que todas las propiedades existan. Si 'finalized' no existe, establecerlo en false
             return {
+                id: task.id,
                 text: task.text || '',
                 completed: !!task.completed,
                 assignedDate: task.assignedDate || today,
                 dueDate: task.dueDate || '',
                 feedback: task.feedback || '',
-                // Comentario del administrador cuando una tarea marcada por el usuario
-                // no es aceptada como finalizada. Se inicializa vacío si no existe.
                 adminFeedback: task.adminFeedback || '',
-                // Indica si el administrador confirmó la finalización de la tarea.
                 finalized: !!task.finalized
             };
         });
     });
-    // Guardar de nuevo para asegurarnos de que la estructura es consistente
     saveTasks(tasks);
     return tasks;
 }
 
-// Guardar tareas
+// Guardar tareas. Esta función siempre guarda en el almacenamiento local
+// para mantener una copia de respaldo. Las operaciones de inserción,
+// actualización y eliminación en la base de datos se gestionan de forma
+// individual en assignTask, updateTask y deleteTask cuando hay un
+// cliente Supabase disponible.
 function saveTasks(tasks) {
     setStorageItem('tasksByUser', JSON.stringify(tasks));
 }
 
-// Asignar tarea a un usuario (usado desde la página de tareas por el administrador)
-function assignTask(username, task, tasksByUser) {
-    // Permitir que tasksByUser sea opcional
+// Asignar tarea a un usuario. Si hay un cliente Supabase, inserta la
+// nueva tarea en la base de datos y asigna el ID devuelto al objeto de
+// tarea local. De lo contrario, funciona exclusivamente con
+// almacenamiento local.
+async function assignTask(username, task, tasksByUser) {
     if (!tasksByUser) {
-        tasksByUser = loadTasks();
+        // Si loadTasks devuelve una promesa, esperar a que se resuelva
+        try {
+            tasksByUser = await loadTasks();
+        } catch (e) {
+            tasksByUser = loadTasks();
+        }
     }
     if (!tasksByUser[username]) {
         tasksByUser[username] = [];
     }
-    // Convertir la entrada en un objeto de tarea completo
     let taskObj;
     const today = new Date().toISOString().split('T')[0];
     if (typeof task === 'string') {
@@ -278,6 +324,7 @@ function assignTask(username, task, tasksByUser) {
             assignedDate: today,
             dueDate: '',
             feedback: '',
+            adminFeedback: '',
             finalized: false
         };
     } else {
@@ -287,21 +334,85 @@ function assignTask(username, task, tasksByUser) {
             assignedDate: task.assignedDate || today,
             dueDate: task.dueDate || '',
             feedback: task.feedback || '',
-            // Al asignar una tarea nueva no hay retroalimentación del administrador
             adminFeedback: task.adminFeedback || '',
             finalized: !!task.finalized
         };
     }
+    // Insertar en Supabase si está disponible
+    if (supabaseClient) {
+        try {
+            const { data, error } = await supabaseClient.from('tasks').insert([
+                {
+                    username: username,
+                    text: taskObj.text,
+                    completed: taskObj.completed,
+                    assigned_date: taskObj.assignedDate,
+                    due_date: taskObj.dueDate || null,
+                    feedback: taskObj.feedback || null,
+                    adminfeedback: taskObj.adminFeedback || null,
+                    finalized: taskObj.finalized
+                }
+            ]).select();
+            if (!error && data && data.length > 0) {
+                taskObj.id = data[0].id;
+            }
+        } catch (e) {
+            console.error('Error al asignar tarea en Supabase:', e);
+        }
+    }
+    // Añadir al arreglo local
     tasksByUser[username].push(taskObj);
     saveTasks(tasksByUser);
 }
 
-// Eliminar una tarea específica de un usuario por índice
-function deleteTask(username, index) {
-    const tasks = loadTasks();
+// Eliminar una tarea específica de un usuario por índice. Si hay un
+// cliente Supabase disponible, también elimina la fila en la tabla
+// `tasks` utilizando el ID de la tarea.
+async function deleteTask(username, index) {
+    let tasks;
+    try {
+        tasks = await loadTasks();
+    } catch (e) {
+        tasks = loadTasks();
+    }
     if (tasks[username]) {
+        const taskObj = tasks[username][index];
+        // Eliminar en la base de datos si es posible
+        if (supabaseClient && taskObj && taskObj.id) {
+            try {
+                await supabaseClient.from('tasks').delete().eq('id', taskObj.id);
+            } catch (e) {
+                console.error('Error al eliminar tarea en Supabase:', e);
+            }
+        }
         tasks[username].splice(index, 1);
         saveTasks(tasks);
+    }
+}
+
+// Actualizar una tarea existente en la base de datos. Se utiliza cuando se
+// modifica el estado de una tarea (por ejemplo, marcada como completada,
+// retroalimentación del usuario o del administrador, finalizada). Si
+// supabaseClient no está disponible o la tarea no tiene un ID, la
+// función no realiza ninguna operación remota.
+async function updateTask(taskObj) {
+    if (supabaseClient && taskObj && taskObj.id) {
+        try {
+            const { error } = await supabaseClient.from('tasks').update({
+                text: taskObj.text,
+                completed: taskObj.completed,
+                assigned_date: taskObj.assignedDate,
+                due_date: taskObj.dueDate || null,
+                feedback: taskObj.feedback || null,
+                adminfeedback: taskObj.adminFeedback || null,
+                finalized: taskObj.finalized
+            }).eq('id', taskObj.id);
+            if (error) {
+                console.error('Error al actualizar tarea en Supabase:', error);
+            }
+        } catch (e) {
+            console.error('Error al actualizar tarea en Supabase:', e);
+        }
     }
 }
 
