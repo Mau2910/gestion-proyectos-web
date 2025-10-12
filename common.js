@@ -1,5 +1,37 @@
 // Funciones comunes y estado global
 
+// ======================================================================
+// Integración con Supabase
+//
+// Para permitir la sincronización de usuarios y tareas entre diferentes
+// dispositivos, puedes conectar esta aplicación con una base de datos
+// alojada en Supabase. Para ello, primero crea un proyecto en
+// https://supabase.com, crea las tablas `users` y `tasks` como se
+// describió en las instrucciones, y localiza el `SUPABASE_URL` y el
+// `anon key` en la sección API de tu proyecto.
+//
+// Una vez tengas los valores, sustitúyelos en las constantes
+// SUPABASE_URL y SUPABASE_ANON_KEY de abajo. La librería de Supabase
+// se carga en las páginas HTML a través de un script CDN.
+// Si los valores permanecen vacíos, la aplicación seguirá utilizando
+// localStorage/window.name como mecanismo de almacenamiento local.
+
+const SUPABASE_URL = '';
+const SUPABASE_ANON_KEY = '';
+
+let supabaseClient = null;
+// Si la librería Supabase y las claves están disponibles, crear un
+// cliente. De lo contrario, supabaseClient quedará como null y la
+// aplicación utilizará almacenamiento local.
+if (typeof supabase !== 'undefined' && SUPABASE_URL && SUPABASE_ANON_KEY) {
+    try {
+        supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    } catch (e) {
+        console.warn('No se pudo inicializar Supabase:', e);
+        supabaseClient = null;
+    }
+}
+
 // Usuarios predeterminados. El administrador usa el nombre "admin".
 // Cada usuario tiene un rol que puede ser 'admin' o 'user'.
 const defaultUsers = [
@@ -100,11 +132,31 @@ function setStorageItem(key, value) {
 }
 
 // Cargar usuarios desde localStorage o usar predeterminados
-function loadUsers() {
-    // Cargar usuarios desde localStorage. Si hay un error de análisis o el
-    // almacenamiento no está disponible, se restablece a los valores
-    // predeterminados. Además se normaliza la estructura de cada usuario para
-    // asegurar que todos tengan rol definido.
+async function loadUsers() {
+    // Si hay un cliente de Supabase configurado, cargar usuarios desde
+    // la tabla `users`. Si la tabla está vacía, se insertan los
+    // usuarios por defecto. Devolverá un array de objetos { username,
+    // password, role }.
+    if (supabaseClient) {
+        try {
+            const { data, error } = await supabaseClient.from('users').select('*');
+            if (!error && Array.isArray(data)) {
+                if (data.length === 0) {
+                    // Insertar usuarios predeterminados en la tabla
+                    await supabaseClient.from('users').insert(defaultUsers);
+                    return defaultUsers.map(u => ({ ...u }));
+                }
+                return data.map(u => ({
+                    username: u.username,
+                    password: u.password,
+                    role: u.role || (u.username === 'admin' ? 'admin' : 'user'),
+                }));
+            }
+        } catch (e) {
+            console.error('Error al cargar usuarios desde Supabase:', e);
+        }
+    }
+    // Fallback: cargar usuarios desde localStorage/window.name
     let users = defaultUsers;
     const stored = getStorageItem('users');
     if (stored) {
@@ -127,8 +179,18 @@ function loadUsers() {
 }
 
 // Guardar usuarios en localStorage
-function saveUsers(users) {
-    // Guardar usuarios solo si el almacenamiento está disponible
+async function saveUsers(users) {
+    // Guardar usuarios. Si se configura Supabase, realizar upsert
+    // (inserción o actualización en caso de conflicto). En caso de error o
+    // ausencia de Supabase, usar almacenamiento local.
+    if (supabaseClient) {
+        try {
+            const { error } = await supabaseClient.from('users').upsert(users, { onConflict: 'username' });
+            if (!error) return;
+        } catch (e) {
+            console.error('Error al guardar usuarios en Supabase:', e);
+        }
+    }
     setStorageItem('users', JSON.stringify(users));
 }
 
@@ -240,19 +302,31 @@ function deleteTask(username, index) {
 
 // Añadir un nuevo usuario con un rol especificado ('user' o 'admin').
 // Devuelve true si el usuario se agregó correctamente o false si ya existe.
-function addUser(newUsername, role = 'user') {
+async function addUser(newUsername, role = 'user') {
     const trimmed = newUsername.trim();
     if (!trimmed) {
         return false;
     }
-    const users = loadUsers();
+    // Asegurarse de que los usuarios actuales se cargan correctamente
+    const users = await loadUsers();
     if (users.some(u => u.username === trimmed)) {
         return false;
     }
     const newUser = { username: trimmed, password: '1234', role: role };
-    users.push(newUser);
-    saveUsers(users);
-    // Inicializar tareas vacías para este usuario
+    if (supabaseClient) {
+        try {
+            const { error } = await supabaseClient.from('users').insert([newUser]);
+            if (!error) {
+                return true;
+            }
+        } catch (e) {
+            console.error('Error al agregar usuario en Supabase:', e);
+        }
+    }
+    // Fallback: usar almacenamiento local
+    const updated = users.concat([newUser]);
+    await saveUsers(updated);
+    // Inicializar tareas vacías para este usuario solo en almacenamiento local
     const tasks = loadTasks();
     tasks[trimmed] = [];
     saveTasks(tasks);
@@ -260,9 +334,9 @@ function addUser(newUsername, role = 'user') {
 }
 
 // Eliminar usuario por nombre. También elimina sus tareas.
-function deleteUser(username) {
+async function deleteUser(username) {
     // Evitar eliminar al último administrador
-    let users = loadUsers();
+    let users = await loadUsers();
     const user = users.find(u => u.username === username);
     if (!user) return;
     if (user.role === 'admin') {
@@ -272,8 +346,16 @@ function deleteUser(username) {
             return;
         }
     }
+    if (supabaseClient) {
+        try {
+            await supabaseClient.from('users').delete().eq('username', username);
+        } catch (e) {
+            console.error('Error al eliminar usuario en Supabase:', e);
+        }
+    }
+    // Fallback: eliminar del almacenamiento local
     users = users.filter(u => u.username !== username);
-    saveUsers(users);
+    await saveUsers(users);
     const tasks = loadTasks();
     delete tasks[username];
     saveTasks(tasks);
