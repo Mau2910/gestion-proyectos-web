@@ -16,8 +16,13 @@
 // Si los valores permanecen vacíos, la aplicación seguirá utilizando
 // localStorage/window.name como mecanismo de almacenamiento local.
 
-const SUPABASE_URL = '';
-const SUPABASE_ANON_KEY = '';
+// URL de Supabase y clave anónima para el proyecto. Estos valores han sido
+// proporcionados por el usuario y permiten conectar la aplicación a la base
+// de datos en la nube para sincronizar usuarios entre dispositivos.
+// Si deseas cambiar de proyecto, sustituye estos valores por los de tu nuevo
+// proyecto en la sección API de Supabase.
+const SUPABASE_URL = 'https://ctzpbzynuoscoxorpppx.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN0enBienludW9zY294b3JwcHB4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjAxODQ2OTgsImV4cCI6MjA3NTc2MDY5OH0.JsLBLGIg-CKdcmd9ZzpJY24AU41H46UmmEzrMq3JcbI';
 
 let supabaseClient = null;
 // Si la librería Supabase y las claves están disponibles, crear un
